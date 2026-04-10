@@ -3,41 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FUAH Tycoon: Grid Edition</title>
+    <title>FUAH Tycoon: Visual & Leaderboard</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #eef2f3; text-align: center; padding: 20px; }
-        .game-container { background: white; padding: 25px; border-radius: 20px; display: inline-block; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 450px; }
+        .game-container { background: white; padding: 25px; border-radius: 20px; display: inline-block; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 500px; vertical-align: top; }
+        .sidebar { display: inline-block; width: 250px; margin-left: 20px; vertical-align: top; }
+        
         .stats { background: #fff9c4; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-weight: bold; border: 2px solid #fbc02d; }
         
-        /* Стилі сітки */
-        .grid-container { 
-            display: grid; 
-            gap: 5px; 
-            margin: 20px auto; 
-            background: #ddd; 
-            padding: 10px; 
-            border-radius: 10px; 
-            justify-content: center;
-        }
+        /* Сітка */
+        .grid-container { display: grid; gap: 5px; margin: 20px auto; background: #ddd; padding: 10px; border-radius: 10px; justify-content: center; }
         .cell { 
-            width: 50px; height: 50px; background: #fff; border: 1px solid #ccc; 
-            border-radius: 5px; cursor: pointer; display: flex; align-items: center; 
-            justify-content: center; font-size: 0.6rem; overflow: hidden; text-align: center;
+            width: 60px; height: 60px; background: #fff; border: 1px solid #ccc; 
+            border-radius: 8px; cursor: pointer; display: flex; align-items: center; 
+            justify-content: center; overflow: hidden; position: relative;
         }
-        .cell.occupied { background: #c8e6c9; border-color: #4caf50; font-weight: bold; }
+        .cell img { width: 100%; height: 100%; object-fit: cover; }
         .cell:hover { background: #f0f0f0; }
 
-        .shop-container { margin: 20px 0; display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; }
-        .building-card { background: #f9f9f9; border: 1px solid #ddd; padding: 10px; border-radius: 8px; text-align: left; position: relative; }
-        .buy-btn { background: #4caf50; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; width: 100%; margin-top: 5px; }
-        .buy-btn.selected { background: #2196f3; box-shadow: 0 0 10px #2196f3; }
-        
+        /* Магазин */
+        .shop-container { margin: 20px 0; display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; }
+        .building-card { background: #f9f9f9; border: 1px solid #ddd; padding: 10px; border-radius: 8px; text-align: left; display: flex; align-items: center; gap: 10px; position: relative; }
+        .build-icon { width: 50px; height: 50px; border-radius: 5px; background: #eee; object-fit: cover; }
+        .buy-btn { background: #4caf50; color: white; border: none; padding: 8px; border-radius: 5px; cursor: pointer; flex-grow: 1; }
+        .buy-btn.selected { background: #2196f3; }
+
+        /* Лідерборд */
+        .leaderboard { background: white; padding: 15px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: left; }
+        .leader-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee; }
+        .leader-rank { font-weight: bold; color: #fbc02d; margin-right: 10px; }
+
+        /* Адмінка */
         .admin-panel { display: none; margin-top: 20px; padding: 15px; background: #ffebee; border: 2px dashed #f44336; border-radius: 12px; text-align: left; }
-        .admin-panel input { width: 90%; margin-bottom: 8px; padding: 5px; }
+        .admin-panel input { width: 92%; margin-bottom: 8px; padding: 6px; border-radius: 4px; border: 1px solid #ccc; }
+        
         .sync-section { margin-top: 20px; background: #e3f2fd; padding: 15px; border-radius: 12px; }
         .btn-blue { background: #2196f3; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; margin: 5px; }
-        .delete-btn { background: #f44336; color: white; border: none; padding: 5px 8px; border-radius: 4px; position: absolute; bottom: 10px; right: 10px; display: none; }
-        .admin-mode .delete-btn { display: block; }
     </style>
 </head>
 <body>
@@ -47,42 +48,45 @@
         
         <div class="stats">
             Баланс: <span id="balance">1000</span> FUAH | Дохід: <span id="income">0</span>/дн<br>
-            Поле: <span id="gridSizeDisplay">6x6</span> | <small>Швидкість: x<span id="timeMult">1.0</span></small>
+            <small>Швидкість: x<span id="timeMult">1.0</span></small>
         </div>
 
         <div id="grid" class="grid-container"></div>
-        <button class="btn-blue" id="btnExpand">Розширити поле (1000 FUAH)</button>
+        <button class="btn-blue" id="btnExpand">Розширити поле (Земля)</button>
 
         <h3>Магазин</h3>
-        <p><small id="statusMsg">Виберіть будівлю, а потім вільну клітинку</small></p>
-        <div id="shop" class="shop-container">Завантаження...</div>
+        <div id="shop" class="shop-container"></div>
 
         <div class="sync-section">
-            <input type="text" id="syncCode" placeholder="Ваш код"> <br>
-            <button class="btn-blue" id="btnSave">Зберегти</button>
-            <button class="btn-blue" id="btnLoad">Завантажити</button>
+            <input type="text" id="userName" placeholder="Ваш Нікнейм">
+            <input type="text" id="syncCode" placeholder="Ваш Секретний Код"> <br>
+            <button class="btn-blue" id="btnSave">Зберегти прогрес</button>
+            <button class="btn-blue" id="btnLoad">Завантажити за кодом</button>
         </div>
 
-        <button id="adminTrigger" style="margin-top: 20px; opacity: 0.1; border: none; background: none;">Адмін</button>
+        <button id="adminTrigger" style="margin-top:20px; opacity:0.1; border:none; background:none;">Адмін</button>
 
         <div id="adminPanel" class="admin-panel">
             <h4>Панель Лахазавра 🦖</h4>
             <input type="text" id="newBuildName" placeholder="Назва">
             <input type="number" id="newBuildPrice" placeholder="Ціна">
             <input type="number" id="newBuildIncome" placeholder="Дохід">
-            <input type="number" id="newBuildTime" step="0.1" placeholder="Множник часу" value="0">
+            <input type="text" id="newBuildImg" placeholder="URL картинки (https://...)">
             <label><input type="checkbox" id="isOneTime"> Одноразова</label>
-            <button id="btnAddBuild" style="width:100%; margin-top:10px;">Додати в глобальну базу</button>
-            <hr>
-            <input type="text" id="targetCode" placeholder="Код гравця">
-            <input type="number" id="amountChange" placeholder="FUAH +/-">
-            <button id="btnEditPlayer">Змінити баланс</button>
+            <button id="btnAddBuild" style="width:100%; margin-top:10px; background:#f44336; color:white; border:none; padding:10px; border-radius:5px; cursor:pointer;">Створити будівлю</button>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <div class="leaderboard">
+            <h3>🏆 Лідерборд</h3>
+            <div id="leaderList">Завантаження...</div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, set, get, onValue, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCd7p3gyOGqlQZsddgkEt4sdcwWPZnCM5M",
@@ -97,155 +101,133 @@
         const db = getDatabase(app);
 
         let gameState = { 
-            balance: 1000, 
-            income: 0, 
-            timeMultiplier: 1.0, 
-            purchasedIds: [], 
-            gridSize: 6,
-            placedBuildings: {}, // формат { "0-1": {name: "Кури"} }
-            lastLogin: Date.now() 
+            nickname: "", balance: 1000, income: 0, timeMultiplier: 1.0, 
+            purchasedIds: [], gridSize: 6, placedBuildings: {}, lastLogin: Date.now() 
         };
         let globalBuildings = {};
-        let selectedBuildingToPlace = null;
+        let selectedBuild = null;
 
         function updateUI() {
             document.getElementById('balance').innerText = Math.floor(gameState.balance);
             document.getElementById('income').innerText = gameState.income;
             document.getElementById('timeMult').innerText = (1 / gameState.timeMultiplier).toFixed(1);
-            document.getElementById('gridSizeDisplay').innerText = `${gameState.gridSize}x${gameState.gridSize}`;
             renderGrid();
             renderShop();
         }
 
         function renderGrid() {
             const gridEl = document.getElementById('grid');
-            gridEl.style.gridTemplateColumns = `repeat(${gameState.gridSize}, 50px)`;
+            gridEl.style.gridTemplateColumns = `repeat(${gameState.gridSize}, 60px)`;
             gridEl.innerHTML = '';
 
             for (let i = 0; i < gameState.gridSize * gameState.gridSize; i++) {
-                const row = Math.floor(i / gameState.gridSize);
-                const col = i % gameState.gridSize;
-                const key = `${row}-${col}`;
+                const key = `${Math.floor(i / gameState.gridSize)}-${i % gameState.gridSize}`;
                 const cell = document.createElement('div');
-                cell.className = 'cell' + (gameState.placedBuildings[key] ? ' occupied' : '');
-                cell.innerText = gameState.placedBuildings[key] ? gameState.placedBuildings[key].name : '';
-                cell.onclick = () => placeBuildingOnGrid(row, col);
+                cell.className = 'cell';
+                if (gameState.placedBuildings[key]) {
+                    const img = document.createElement('img');
+                    img.src = gameState.placedBuildings[key].img || 'https://via.placeholder.com/60?text=FUAH';
+                    cell.appendChild(img);
+                }
+                cell.onclick = () => placeBuilding(key);
                 gridEl.appendChild(cell);
             }
         }
 
         function renderShop() {
             const shopEl = document.getElementById('shop');
-            const isAdminVisible = document.getElementById('adminPanel').style.display === 'block';
-            if (isAdminVisible) document.body.classList.add('admin-mode');
-
             shopEl.innerHTML = '';
             for (let id in globalBuildings) {
                 const b = globalBuildings[id];
-                const isBought = gameState.purchasedIds && gameState.purchasedIds.includes(id);
-                if (b.isOneTime && isBought) continue; 
+                if (b.isOneTime && gameState.purchasedIds?.includes(id)) continue;
 
                 const card = document.createElement('div');
                 card.className = 'building-card';
-                card.innerHTML += `<b>${b.name}</b><br>Ціна: ${b.price} | +${b.income}/дн`;
+                card.innerHTML = `<img src="${b.img || 'https://via.placeholder.com/50'}" class="build-icon">
+                                 <div><b>${b.name}</b><br><small>${b.price} FUAH | +${b.income}</small></div>`;
                 
-                const btnBuy = document.createElement('button');
-                btnBuy.className = 'buy-btn' + (selectedBuildingToPlace?.id === id ? ' selected' : '');
-                btnBuy.innerText = selectedBuildingToPlace?.id === id ? 'Виберіть клітинку...' : 'Купити';
-                btnBuy.onclick = () => {
-                    selectedBuildingToPlace = { ...b, id };
-                    renderShop();
-                };
-                card.appendChild(btnBuy);
-
-                const btnDel = document.createElement('button');
-                btnDel.className = 'delete-btn';
-                btnDel.innerHTML = '🗑️';
-                btnDel.onclick = (e) => { e.stopPropagation(); deleteBuilding(id); };
-                card.appendChild(btnDel);
+                const btn = document.createElement('button');
+                btn.className = 'buy-btn' + (selectedBuild?.id === id ? ' selected' : '');
+                btn.innerText = selectedBuild?.id === id ? 'Став на поле!' : 'Вибрати';
+                btn.onclick = () => { selectedBuild = { ...b, id }; renderShop(); };
+                
+                card.appendChild(btn);
                 shopEl.appendChild(card);
             }
         }
 
-        function placeBuildingOnGrid(row, col) {
-            const key = `${row}-${col}`;
-            if (!selectedBuildingToPlace) return;
-            if (gameState.placedBuildings[key]) return alert("Клітинка зайнята!");
-            if (gameState.balance < selectedBuildingToPlace.price) return alert("Бракує грошей!");
+        function placeBuilding(key) {
+            if (!selectedBuild) return;
+            if (gameState.placedBuildings[key]) return alert("Зайнято!");
+            if (gameState.balance < selectedBuild.price) return alert("Бракує грошей!");
 
-            gameState.balance -= selectedBuildingToPlace.price;
-            gameState.income += (selectedBuildingToPlace.income || 0);
+            gameState.balance -= selectedBuild.price;
+            gameState.income += (selectedBuild.income || 0);
+            gameState.placedBuildings[key] = { name: selectedBuild.name, img: selectedBuild.img };
             
-            if (selectedBuildingToPlace.timeMultiplier > 0) {
-                gameState.timeMultiplier -= selectedBuildingToPlace.timeMultiplier;
-                if (gameState.timeMultiplier < 0.1) gameState.timeMultiplier = 0.1;
-            }
-
-            if (selectedBuildingToPlace.isOneTime) {
+            if (selectedBuild.isOneTime) {
                 if (!gameState.purchasedIds) gameState.purchasedIds = [];
-                gameState.purchasedIds.push(selectedBuildingToPlace.id);
+                gameState.purchasedIds.push(selectedBuild.id);
             }
-
-            gameState.placedBuildings[key] = { name: selectedBuildingToPlace.name };
-            selectedBuildingToPlace = null;
+            selectedBuild = null;
             updateUI();
         }
 
-        document.getElementById('btnExpand').onclick = () => {
-            const cost = gameState.gridSize * 200;
-            if (gameState.balance >= cost) {
-                gameState.balance -= cost;
-                gameState.gridSize++;
-                updateUI();
-                alert("Поле розширено!");
-            } else { alert(`Треба ${cost} FUAH`); }
-        };
+        // ЛІДЕРБОРД
+        onValue(ref(db, 'players'), (snap) => {
+            const players = snap.val();
+            const listEl = document.getElementById('leaderList');
+            listEl.innerHTML = '';
+            
+            let sorted = [];
+            for(let id in players) sorted.push(players[id]);
+            sorted.sort((a, b) => b.balance - a.balance);
 
-        // FIREBASE EVENTS & SYNC (ВЖЕ ІСНУЮЧІ)
-        function deleteBuilding(id) { remove(ref(db, 'global_buildings/' + id)); }
+            sorted.slice(0, 10).forEach((p, index) => {
+                listEl.innerHTML += `<div class="leader-item">
+                    <span><span class="leader-rank">#${index+1}</span> ${p.nickname || 'Анонім'}</span>
+                    <b>${Math.floor(p.balance)}</b>
+                </div>`;
+            });
+        });
 
+        // БАЗОВІ ФУНКЦІЇ
         onValue(ref(db, 'global_buildings'), (snap) => { globalBuildings = snap.val() || {}; renderShop(); });
 
         document.getElementById('btnSave').onclick = () => {
             const code = document.getElementById('syncCode').value;
-            if (!code) return alert("Код!");
+            const nick = document.getElementById('userName').value;
+            if (!code || !nick) return alert("Введіть і нік, і код!");
+            gameState.nickname = nick;
             gameState.lastLogin = Date.now();
-            set(ref(db, 'players/' + code), gameState).then(() => alert("Збережено!"));
+            set(ref(db, 'players/' + code), gameState).then(() => alert("Прогрес збережено!"));
         };
 
         document.getElementById('btnLoad').onclick = async () => {
             const code = document.getElementById('syncCode').value;
             const snap = await get(ref(db, 'players/' + code));
             if (snap.exists()) {
-                const loaded = snap.val();
-                const now = Date.now();
-                const effectiveMsPerDay = (24 * 60 * 60 * 1000) * (loaded.timeMultiplier || 1);
-                const earnings = Math.floor(((now - loaded.lastLogin) / effectiveMsPerDay) * (loaded.income || 0));
-                
-                gameState = loaded;
-                if (!gameState.placedBuildings) gameState.placedBuildings = {};
-                gameState.balance += earnings;
-                gameState.lastLogin = now;
+                gameState = snap.val();
+                document.getElementById('userName').value = gameState.nickname || "";
                 updateUI();
-            }
+            } else alert("Невірний код!");
         };
 
         document.getElementById('btnAddBuild').onclick = () => {
             const name = document.getElementById('newBuildName').value;
             const price = parseInt(document.getElementById('newBuildPrice').value);
-            const income = parseInt(document.getElementById('newBuildIncome').value) || 0;
-            const timeMult = parseFloat(document.getElementById('newBuildTime').value) || 0;
-            const isOneTime = document.getElementById('isOneTime').checked;
+            const img = document.getElementById('newBuildImg').value;
             if (name && price) {
-                set(ref(db, 'global_buildings/b_' + Date.now()), { name, price, income, timeMultiplier: timeMult, isOneTime });
+                set(ref(db, 'global_buildings/b_' + Date.now()), { 
+                    name, price, income: parseInt(document.getElementById('newBuildIncome').value) || 0,
+                    img, isOneTime: document.getElementById('isOneTime').checked 
+                });
+                alert("Будівлю створено!");
             }
         };
 
         document.getElementById('adminTrigger').onclick = () => {
-            if(prompt("Пароль:") === "Lahazavr88@99") {
-                document.getElementById('adminPanel').style.display = 'block';
-                renderShop();
-            }
+            if(prompt("Пароль:") === "Lahazavr88@99") document.getElementById('adminPanel').style.display = 'block';
         };
 
         updateUI();
