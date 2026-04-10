@@ -3,43 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FUAH Tycoon: Beaver Clicker</title>
+    <title>FUAH Tycoon: Grid Fix</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #eef2f3; text-align: center; padding: 20px; margin: 0; }
         .main-layout { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
         .game-container { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 450px; }
         .sidebar { width: 280px; display: flex; flex-direction: column; gap: 20px; }
-        
         .stats { background: #fff9c4; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-weight: bold; border: 2px solid #fbc02d; font-size: 1.1rem; }
         
         /* Клікер */
         .clicker-section { background: #e8f5e9; padding: 20px; border-radius: 20px; border: 3px solid #4caf50; position: relative; }
         #beaverBtn { font-size: 50px; background: none; border: none; cursor: pointer; transition: transform 0.1s; user-select: none; }
         #beaverBtn:active { transform: scale(0.9); }
-        .capy-float { position: absolute; font-size: 24px; animation: floatUp 0.8s forwards; pointer-events: none; }
-        @keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-50px); } }
+        .capy-float { position: absolute; font-size: 24px; animation: floatUp 0.8s forwards; pointer-events: none; z-index: 1000; }
+        @keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-100px); } }
 
         /* Сітка */
-        .grid-container { display: grid; gap: 4px; margin: 15px auto; background: #ccc; padding: 8px; border-radius: 10px; width: fit-content; }
-        .cell { width: 55px; height: 55px; background: #fff; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .grid-container { display: grid; gap: 4px; margin: 15px auto; background: #ccc; padding: 8px; border-radius: 10px; width: fit-content; min-height: 50px; }
+        .cell { width: 55px; height: 55px; background: #fff; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #bbb; }
         .cell img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* Лідерборд */
+        /* Магазин */
+        .shop-container { max-height: 250px; overflow-y: auto; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
+        .building-card { background: #fdfdfd; border: 1px solid #eee; margin-bottom: 8px; padding: 8px; display: flex; align-items: center; gap: 10px; border-radius: 8px; text-align: left; }
+        .build-img { width: 45px; height: 45px; border-radius: 5px; background: #eee; }
+
         .leaderboard { background: white; padding: 15px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: left; }
         .leader-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dotted #ccc; font-size: 0.9rem; }
         
-        /* Адмінка та Синхронізація */
         .sync-section { background: #e3f2fd; padding: 15px; border-radius: 15px; margin-top: 15px; }
         .sync-section input { width: 85%; margin-bottom: 8px; padding: 8px; border-radius: 6px; border: 1px solid #90caf9; }
-        .admin-panel { display: none; margin-top: 20px; padding: 15px; background: #ffebee; border: 2px dashed #f44336; border-radius: 12px; text-align: left; }
-        .admin-panel input { width: 90%; margin-bottom: 5px; padding: 5px; }
         
         .btn { background: #2196f3; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 5px; }
         .btn-green { background: #4caf50; }
-        
-        .shop-container { max-height: 300px; overflow-y: auto; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
-        .building-card { background: #fdfdfd; border: 1px solid #eee; margin-bottom: 8px; padding: 8px; display: flex; align-items: center; gap: 10px; border-radius: 8px; text-align: left; }
-        .build-img { width: 45px; height: 45px; border-radius: 5px; }
+        .admin-panel { display: none; margin-top: 20px; padding: 15px; background: #ffebee; border: 2px dashed #f44336; border-radius: 12px; text-align: left; }
     </style>
 </head>
 <body>
@@ -51,7 +48,6 @@
             <button id="beaverBtn">🦫</button>
             <p>Клікай бобра — отримуй 5 FUAH!</p>
         </div>
-
         <div class="leaderboard">
             <h3>🏆 ТОП Гравців</h3>
             <div id="leaderList">Завантаження...</div>
@@ -67,7 +63,7 @@
         </div>
 
         <div id="grid" class="grid-container"></div>
-        <button class="btn" id="btnExpand">🚜 Розширити поле (Земля)</button>
+        <button class="btn" id="btnExpand">🚜 Розширити поле</button>
 
         <h3>🏗️ Магазин</h3>
         <div id="shop" class="shop-container"></div>
@@ -109,8 +105,7 @@
     const db = getDatabase(app);
 
     let gameState = { 
-        nickname: "", balance: 1000, income: 0, timeMultiplier: 1.0, 
-        gridSize: 6, placedBuildings: {}, lastLogin: Date.now() 
+        nickname: "", balance: 1000, income: 0, gridSize: 6, placedBuildings: {}, lastLogin: Date.now() 
     };
     let globalBuildings = {};
     let selectedBuild = null;
@@ -122,17 +117,15 @@
         renderShop();
     }
 
-    // --- КЛІКЕР МЕХАНІКА ---
+    // --- КЛІКЕР ---
     document.getElementById('beaverBtn').onclick = (e) => {
         gameState.balance += 5;
         document.getElementById('balance').innerText = Math.floor(gameState.balance);
-        
-        // Анімація капібари
         const capy = document.createElement('div');
         capy.className = 'capy-float';
         capy.innerText = '🐹';
-        capy.style.left = (e.clientX - 20) + 'px';
-        capy.style.top = (e.clientY - 20) + 'px';
+        capy.style.left = e.clientX + 'px';
+        capy.style.top = e.clientY + 'px';
         capy.style.position = 'fixed';
         document.body.appendChild(capy);
         setTimeout(() => capy.remove(), 800);
@@ -140,25 +133,29 @@
 
     function renderGrid() {
         const gridEl = document.getElementById('grid');
-        gridEl.style.gridTemplateColumns = `repeat(${gameState.gridSize}, 55px)`;
+        const size = gameState.gridSize || 6;
+        gridEl.style.gridTemplateColumns = `repeat(${size}, 55px)`;
         gridEl.innerHTML = '';
 
-        for (let i = 0; i < gameState.gridSize * gameState.gridSize; i++) {
-            const key = `${Math.floor(i / gameState.gridSize)}-${i % gameState.gridSize}`;
+        for (let i = 0; i < size * size; i++) {
+            const key = `${Math.floor(i / size)}-${i % size}`;
             const cell = document.createElement('div');
             cell.className = 'cell';
-            if (gameState.placedBuildings[key]) {
+            
+            if (gameState.placedBuildings && gameState.placedBuildings[key]) {
                 const img = document.createElement('img');
-                img.src = gameState.placedBuildings[key].img || 'https://via.placeholder.com/55';
+                img.src = gameState.placedBuildings[key].img || '';
                 cell.appendChild(img);
             }
+
             cell.onclick = () => {
                 if (!selectedBuild) return;
-                if (gameState.placedBuildings[key]) return alert("Зайнято!");
+                if (gameState.placedBuildings && gameState.placedBuildings[key]) return alert("Зайнято!");
                 if (gameState.balance < selectedBuild.price) return alert("Бракує FUAH!");
 
                 gameState.balance -= selectedBuild.price;
                 gameState.income += (selectedBuild.income || 0);
+                if(!gameState.placedBuildings) gameState.placedBuildings = {};
                 gameState.placedBuildings[key] = { name: selectedBuild.name, img: selectedBuild.img };
                 selectedBuild = null;
                 updateUI();
@@ -174,58 +171,76 @@
             const b = globalBuildings[id];
             const card = document.createElement('div');
             card.className = 'building-card';
-            card.innerHTML = `<img src="${b.img || 'https://via.placeholder.com/45'}" class="build-img">
+            card.innerHTML = `<img src="${b.img || ''}" class="build-img">
                              <div style="flex-grow:1"><b>${b.name}</b><br><small>${b.price} FUAH | +${b.income}</small></div>`;
-            
             const btn = document.createElement('button');
             btn.className = 'btn' + (selectedBuild?.id === id ? ' btn-green' : '');
             btn.innerText = selectedBuild?.id === id ? '✅' : 'Купити';
             btn.onclick = () => { selectedBuild = { ...b, id }; renderShop(); };
-            
             card.appendChild(btn);
             shopEl.appendChild(card);
         }
     }
 
-    // ЛІДЕРБОРД
+    // --- ЛІДЕРБОРД ---
     onValue(ref(db, 'players'), (snap) => {
         const players = snap.val();
         const listEl = document.getElementById('leaderList');
         if (!players) return;
         listEl.innerHTML = '';
-        let sorted = Object.values(players).sort((a, b) => b.balance - a.balance);
+        let sorted = Object.values(players).sort((a, b) => (b.balance || 0) - (a.balance || 0));
         sorted.slice(0, 10).forEach((p, idx) => {
-            listEl.innerHTML += `<div class="leader-item"><span>#${idx+1} ${p.nickname || 'Анонім'}</span><b>${Math.floor(p.balance)}</b></div>`;
+            listEl.innerHTML += `<div class="leader-item"><span>#${idx+1} ${p.nickname || 'Анонім'}</span><b>${Math.floor(p.balance || 0)}</b></div>`;
         });
     });
 
-    onValue(ref(db, 'global_buildings'), (snap) => { globalBuildings = snap.val() || {}; renderShop(); });
+    onValue(ref(db, 'global_buildings'), (snap) => { 
+        globalBuildings = snap.val() || {}; 
+        renderShop(); 
+    });
 
+    // --- ЗБЕРЕЖЕННЯ ТА ЗАВАНТАЖЕННЯ (ФІКС) ---
     document.getElementById('btnSave').onclick = () => {
         const code = document.getElementById('syncCode').value;
         const nick = document.getElementById('userName').value;
         if (!code || !nick) return alert("Заповни нік і код!");
+        
         gameState.nickname = nick;
         gameState.lastLogin = Date.now();
-        set(ref(db, 'players/' + code), gameState).then(() => alert("Збережено!"));
+        
+        set(ref(db, 'players/' + code), gameState)
+            .then(() => alert("Успішно збережено! Поле та баланс у безпеці."))
+            .catch(e => alert("Помилка: " + e.message));
     };
 
     document.getElementById('btnLoad').onclick = async () => {
         const code = document.getElementById('syncCode').value;
         if (!code) return alert("Введи код!");
+        
         const snap = await get(ref(db, 'players/' + code));
         if (snap.exists()) {
-            gameState = snap.val();
-            document.getElementById('userName').value = gameState.nickname || "";
-            updateUI();
-        } else alert("Не знайдено!");
+            const data = snap.val();
+            // Глибоке копіювання, щоб нічого не загубити
+            gameState.nickname = data.nickname || "";
+            gameState.balance = Number(data.balance) || 0;
+            gameState.income = Number(data.income) || 0;
+            gameState.gridSize = Number(data.gridSize) || 6;
+            gameState.placedBuildings = data.placedBuildings || {};
+            gameState.lastLogin = data.lastLogin || Date.now();
+
+            document.getElementById('userName').value = gameState.nickname;
+            updateUI(); // Примусове оновлення всього інтерфейсу
+            alert("Дані завантажено!");
+        } else {
+            alert("Код не знайдено в базі!");
+        }
     };
 
     document.getElementById('btnExpand').onclick = () => {
-        const cost = gameState.gridSize * 300;
+        const cost = (gameState.gridSize || 6) * 300;
         if (gameState.balance >= cost) {
             gameState.balance -= cost;
-            gameState.gridSize++;
+            gameState.gridSize = (gameState.gridSize || 6) + 1;
             updateUI();
         } else alert("Треба " + cost + " FUAH");
     };
@@ -235,10 +250,11 @@
         const price = parseInt(document.getElementById('newBuildPrice').value);
         if (name && price) {
             set(ref(db, 'global_buildings/b_' + Date.now()), { 
-                name, price, income: parseInt(document.getElementById('newBuildIncome').value) || 0,
+                name, price, 
+                income: parseInt(document.getElementById('newBuildIncome').value) || 0,
                 img: document.getElementById('newBuildImg').value 
             });
-            alert("Будівлю додано!");
+            alert("Додано!");
         }
     };
 
