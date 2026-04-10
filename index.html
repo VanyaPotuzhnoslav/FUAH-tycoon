@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FUAH Tycoon PRO</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f3; text-align: center; padding: 20px; }
+        .game-container { background: white; padding: 25px; border-radius: 20px; display: inline-block; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; }
+        .stats { background: #fff9c4; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-weight: bold; border: 2px solid #fbc02d; }
+        
+        .shop-container { margin: 20px 0; display: flex; flex-direction: column; gap: 10px; }
+        .building-card { background: #f9f9f9; border: 1px solid #ddd; padding: 10px; border-radius: 8px; }
+        .buy-btn { background: #4caf50; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; width: 100%; transition: 0.3s; }
+        .buy-btn:hover { background: #388e3c; }
+
+        .admin-panel { display: none; margin-top: 20px; padding: 15px; background: #ffebee; border: 2px dashed #f44336; border-radius: 12px; text-align: left; }
+        .admin-panel input { width: 90%; margin-bottom: 5px; padding: 5px; }
+        .sync-section { margin-top: 20px; background: #e3f2fd; padding: 15px; border-radius: 12px; }
+        .btn-blue { background: #2196f3; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; margin: 5px; }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>FUAH Tycoon</h1>
+        
+        <div class="stats">
+            Баланс: <span id="balance">1000</span> FUAH<br>
+            Дохід: <span id="income">0</span> FUAH/день
+        </div>
+
+        <h3>Магазин</h3>
+        <div id="shop" class="shop-container">
+            </div>
+
+        <div class="sync-section">
+            <input type="text" id="syncCode" placeholder="Ваш код (напр. 1)"> <br>
+            <button class="btn-blue" onclick="saveGame()">Зберегти</button>
+            <button class="btn-blue" onclick="loadGame()">Завантажити</button>
+        </div>
+
+        <button onclick="checkAdmin()" style="margin-top: 20px; opacity: 0.3; border: none; background: none; cursor: pointer;">Адмін</button>
+
+        <div id="adminPanel" class="admin-panel">
+            <h4>Панель керування</h4>
+            
+            <p><b>1. Додати нову будівлю:</b></p>
+            <input type="text" id="newBuildName" placeholder="Назва (напр. Ферма)">
+            <input type="number" id="newBuildPrice" placeholder="Ціна (FUAH)">
+            <input type="number" id="newBuildIncome" placeholder="Дохід/день">
+            <button onclick="addNewBuilding()">Додати в магазин</button>
+
+            <hr>
+            <p><b>2. Редагувати чужий баланс:</b></p>
+            <input type="text" id="targetCode" placeholder="Код гравця">
+            <input type="number" id="amountChange" placeholder="Сума (+ або -)">
+            <button onclick="editPlayerBalance()">Змінити баланс</button>
+        </div>
+    </div>
+
+    <script>
+        let gameState = {
+            balance: 1000,
+            income: 0,
+            lastLogin: Date.now()
+        };
+
+        // Початковий список будівель (можна доповнювати через адмінку)
+        let availableBuildings = JSON.parse(localStorage.getItem('global_buildings')) || [
+            { id: 'chicken', name: 'Курячий загін', price: 500, income: 100 }
+        ];
+
+        function updateUI() {
+            document.getElementById('balance').innerText = Math.floor(gameState.balance);
+            document.getElementById('income').innerText = gameState.income;
+            renderShop();
+        }
+
+        function renderShop() {
+            const shopEl = document.getElementById('shop');
+            shopEl.innerHTML = '';
+            availableBuildings.forEach((b, index) => {
+                shopEl.innerHTML += `
+                    <div class="building-card">
+                        <b>${b.name}</b><br>
+                        Ціна: ${b.price} | Дохід: ${b.income}<br>
+                        <button class="buy-btn" onclick="buyBuilding(${index})">Купити</button>
+                    </div>
+                `;
+            });
+        }
+
+        function buyBuilding(index) {
+            const b = availableBuildings[index];
+            if (gameState.balance >= b.price) {
+                gameState.balance -= b.price;
+                gameState.income += b.income;
+                updateUI();
+            } else {
+                alert("Недостатньо коштів!");
+            }
+        }
+
+        // --- АДМІН ФУНКЦІЇ ---
+
+        function checkAdmin() {
+            const pass = prompt("Введіть адмін-код:");
+            if (pass === "Lahazavr88@99") {
+                document.getElementById('adminPanel').style.display = 'block';
+                alert("Доступ дозволено!");
+            } else {
+                alert("Невірний код!");
+            }
+        }
+
+        function addNewBuilding() {
+            const name = document.getElementById('newBuildName').value;
+            const price = parseInt(document.getElementById('newBuildPrice').value);
+            const income = parseInt(document.getElementById('newBuildIncome').value);
+
+            if (name && price && income) {
+                availableBuildings.push({ id: Date.now(), name, price, income });
+                localStorage.setItem('global_buildings', JSON.stringify(availableBuildings));
+                renderShop();
+                alert("Будівлю додано для всіх!");
+            }
+        }
+
+        function editPlayerBalance() {
+            const code = document.getElementById('targetCode').value;
+            const amount = parseFloat(document.getElementById('amountChange').value);
+            const targetData = localStorage.getItem('fuah_save_' + code);
+
+            if (targetData && !isNaN(amount)) {
+                let pState = JSON.parse(targetData);
+                pState.balance += amount;
+                localStorage.setItem('fuah_save_' + code, JSON.stringify(pState));
+                alert(`Баланс гравця ${code} змінено на ${amount}. Новий баланс: ${pState.balance}`);
+                
+                // Якщо адмін редагує СВІЙ поточний акаунт - оновити екран
+                if (document.getElementById('syncCode').value === code) {
+                    gameState = pState;
+                    updateUI();
+                }
+            } else {
+                alert("Гравця не знайдено або сума некоректна");
+            }
+        }
+
+        // --- СИНХРОНІЗАЦІЯ ---
+
+        function saveGame() {
+            const code = document.getElementById('syncCode').value;
+            if (!code) return alert("Введіть код!");
+            gameState.lastLogin = Date.now();
+            localStorage.setItem('fuah_save_' + code, JSON.stringify(gameState));
+            alert("Збережено!");
+        }
+
+        function loadGame() {
+            const code = document.getElementById('syncCode').value;
+            const savedData = localStorage.getItem('fuah_save_' + code);
+            if (savedData) {
+                const loaded = JSON.parse(savedData);
+                const now = Date.now();
+                const days = (now - loaded.lastLogin) / (24 * 60 * 60 * 1000);
+                const earnings = days * loaded.income;
+                
+                gameState = loaded;
+                gameState.balance += earnings;
+                gameState.lastLogin = now;
+                updateUI();
+                alert(`Завантажено! Прибуток: +${earnings.toFixed(2)}`);
+            } else {
+                alert("Код не знайдено");
+            }
+        }
+
+        updateUI();
+    </script>
+</body>
+</html>
