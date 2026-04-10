@@ -3,24 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FUAH Tycoon: Fixed Online</title>
+    <title>FUAH Tycoon: Grid Edition</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #eef2f3; text-align: center; padding: 20px; }
-        .game-container { background: white; padding: 25px; border-radius: 20px; display: inline-block; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 380px; }
+        .game-container { background: white; padding: 25px; border-radius: 20px; display: inline-block; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 450px; }
         .stats { background: #fff9c4; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-weight: bold; border: 2px solid #fbc02d; }
-        .shop-container { margin: 20px 0; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Стилі сітки */
+        .grid-container { 
+            display: grid; 
+            gap: 5px; 
+            margin: 20px auto; 
+            background: #ddd; 
+            padding: 10px; 
+            border-radius: 10px; 
+            justify-content: center;
+        }
+        .cell { 
+            width: 50px; height: 50px; background: #fff; border: 1px solid #ccc; 
+            border-radius: 5px; cursor: pointer; display: flex; align-items: center; 
+            justify-content: center; font-size: 0.6rem; overflow: hidden; text-align: center;
+        }
+        .cell.occupied { background: #c8e6c9; border-color: #4caf50; font-weight: bold; }
+        .cell:hover { background: #f0f0f0; }
+
+        .shop-container { margin: 20px 0; display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; }
         .building-card { background: #f9f9f9; border: 1px solid #ddd; padding: 10px; border-radius: 8px; text-align: left; position: relative; }
         .buy-btn { background: #4caf50; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; width: 100%; margin-top: 5px; }
+        .buy-btn.selected { background: #2196f3; box-shadow: 0 0 10px #2196f3; }
+        
         .admin-panel { display: none; margin-top: 20px; padding: 15px; background: #ffebee; border: 2px dashed #f44336; border-radius: 12px; text-align: left; }
         .admin-panel input { width: 90%; margin-bottom: 8px; padding: 5px; }
         .sync-section { margin-top: 20px; background: #e3f2fd; padding: 15px; border-radius: 12px; }
         .btn-blue { background: #2196f3; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; margin: 5px; }
-        .badge { background: #ff5722; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; position: absolute; top: 5px; right: 5px; }
-        
-        .delete-btn {
-            background: #f44336; color: white; border: none; padding: 5px 8px; border-radius: 4px;
-            cursor: pointer; font-size: 0.8rem; position: absolute; bottom: 10px; right: 10px; display: none;
-        }
+        .delete-btn { background: #f44336; color: white; border: none; padding: 5px 8px; border-radius: 4px; position: absolute; bottom: 10px; right: 10px; display: none; }
         .admin-mode .delete-btn { display: block; }
     </style>
 </head>
@@ -30,12 +46,15 @@
         <h1>FUAH Tycoon 🌐</h1>
         
         <div class="stats">
-            Баланс: <span id="balance">1000</span> FUAH<br>
-            Дохід: <span id="income">0</span> FUAH/день<br>
-            <small>Швидкість часу: x<span id="timeMult">1.0</span></small>
+            Баланс: <span id="balance">1000</span> FUAH | Дохід: <span id="income">0</span>/дн<br>
+            Поле: <span id="gridSizeDisplay">6x6</span> | <small>Швидкість: x<span id="timeMult">1.0</span></small>
         </div>
 
+        <div id="grid" class="grid-container"></div>
+        <button class="btn-blue" id="btnExpand">Розширити поле (1000 FUAH)</button>
+
         <h3>Магазин</h3>
+        <p><small id="statusMsg">Виберіть будівлю, а потім вільну клітинку</small></p>
         <div id="shop" class="shop-container">Завантаження...</div>
 
         <div class="sync-section">
@@ -44,16 +63,16 @@
             <button class="btn-blue" id="btnLoad">Завантажити</button>
         </div>
 
-        <button id="adminTrigger" style="margin-top: 20px; opacity: 0.1; border: none; background: none; cursor: pointer;">Адмін</button>
+        <button id="adminTrigger" style="margin-top: 20px; opacity: 0.1; border: none; background: none;">Адмін</button>
 
         <div id="adminPanel" class="admin-panel">
             <h4>Панель Лахазавра 🦖</h4>
             <input type="text" id="newBuildName" placeholder="Назва">
             <input type="number" id="newBuildPrice" placeholder="Ціна">
-            <input type="number" id="newBuildIncome" placeholder="Дохід (+)">
-            <input type="number" id="newBuildTime" step="0.1" placeholder="Множник часу (напр. 0.5)" value="0">
+            <input type="number" id="newBuildIncome" placeholder="Дохід">
+            <input type="number" id="newBuildTime" step="0.1" placeholder="Множник часу" value="0">
             <label><input type="checkbox" id="isOneTime"> Одноразова</label>
-            <button id="btnAddBuild" style="width:100%; margin-top:10px;">Додати будівлю</button>
+            <button id="btnAddBuild" style="width:100%; margin-top:10px;">Додати в глобальну базу</button>
             <hr>
             <input type="text" id="targetCode" placeholder="Код гравця">
             <input type="number" id="amountChange" placeholder="FUAH +/-">
@@ -77,14 +96,42 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        let gameState = { balance: 1000, income: 0, timeMultiplier: 1.0, purchasedIds: [], lastLogin: Date.now() };
+        let gameState = { 
+            balance: 1000, 
+            income: 0, 
+            timeMultiplier: 1.0, 
+            purchasedIds: [], 
+            gridSize: 6,
+            placedBuildings: {}, // формат { "0-1": {name: "Кури"} }
+            lastLogin: Date.now() 
+        };
         let globalBuildings = {};
+        let selectedBuildingToPlace = null;
 
         function updateUI() {
             document.getElementById('balance').innerText = Math.floor(gameState.balance);
             document.getElementById('income').innerText = gameState.income;
             document.getElementById('timeMult').innerText = (1 / gameState.timeMultiplier).toFixed(1);
+            document.getElementById('gridSizeDisplay').innerText = `${gameState.gridSize}x${gameState.gridSize}`;
+            renderGrid();
             renderShop();
+        }
+
+        function renderGrid() {
+            const gridEl = document.getElementById('grid');
+            gridEl.style.gridTemplateColumns = `repeat(${gameState.gridSize}, 50px)`;
+            gridEl.innerHTML = '';
+
+            for (let i = 0; i < gameState.gridSize * gameState.gridSize; i++) {
+                const row = Math.floor(i / gameState.gridSize);
+                const col = i % gameState.gridSize;
+                const key = `${row}-${col}`;
+                const cell = document.createElement('div');
+                cell.className = 'cell' + (gameState.placedBuildings[key] ? ' occupied' : '');
+                cell.innerText = gameState.placedBuildings[key] ? gameState.placedBuildings[key].name : '';
+                cell.onclick = () => placeBuildingOnGrid(row, col);
+                gridEl.appendChild(cell);
+            }
         }
 
         function renderShop() {
@@ -100,58 +147,68 @@
 
                 const card = document.createElement('div');
                 card.className = 'building-card';
-                let info = b.income > 0 ? `+${b.income} FUAH/дн` : `Прискорює час`;
-                if (b.isOneTime) card.innerHTML += `<span class="badge">1-разове</span>`;
-                card.innerHTML += `<b>${b.name}</b><br>Ціна: ${b.price} | ${info}`;
+                card.innerHTML += `<b>${b.name}</b><br>Ціна: ${b.price} | +${b.income}/дн`;
                 
                 const btnBuy = document.createElement('button');
-                btnBuy.className = 'buy-btn';
-                btnBuy.innerText = 'Купити';
-                btnBuy.onclick = () => buyBuilding(id, b);
+                btnBuy.className = 'buy-btn' + (selectedBuildingToPlace?.id === id ? ' selected' : '');
+                btnBuy.innerText = selectedBuildingToPlace?.id === id ? 'Виберіть клітинку...' : 'Купити';
+                btnBuy.onclick = () => {
+                    selectedBuildingToPlace = { ...b, id };
+                    renderShop();
+                };
                 card.appendChild(btnBuy);
 
                 const btnDel = document.createElement('button');
                 btnDel.className = 'delete-btn';
                 btnDel.innerHTML = '🗑️';
-                btnDel.onclick = (e) => {
-                    e.stopPropagation();
-                    if(confirm(`Видалити "${b.name}"?`)) deleteBuilding(id);
-                };
+                btnDel.onclick = (e) => { e.stopPropagation(); deleteBuilding(id); };
                 card.appendChild(btnDel);
                 shopEl.appendChild(card);
             }
         }
 
-        function buyBuilding(id, b) {
-            if (gameState.balance >= b.price) {
-                gameState.balance -= b.price;
-                gameState.income += (b.income || 0);
-                if (b.timeMultiplier > 0) {
-                    gameState.timeMultiplier -= b.timeMultiplier;
-                    if (gameState.timeMultiplier < 0.1) gameState.timeMultiplier = 0.1;
-                }
-                if (b.isOneTime) {
-                    if (!gameState.purchasedIds) gameState.purchasedIds = [];
-                    gameState.purchasedIds.push(id);
-                }
+        function placeBuildingOnGrid(row, col) {
+            const key = `${row}-${col}`;
+            if (!selectedBuildingToPlace) return;
+            if (gameState.placedBuildings[key]) return alert("Клітинка зайнята!");
+            if (gameState.balance < selectedBuildingToPlace.price) return alert("Бракує грошей!");
+
+            gameState.balance -= selectedBuildingToPlace.price;
+            gameState.income += (selectedBuildingToPlace.income || 0);
+            
+            if (selectedBuildingToPlace.timeMultiplier > 0) {
+                gameState.timeMultiplier -= selectedBuildingToPlace.timeMultiplier;
+                if (gameState.timeMultiplier < 0.1) gameState.timeMultiplier = 0.1;
+            }
+
+            if (selectedBuildingToPlace.isOneTime) {
+                if (!gameState.purchasedIds) gameState.purchasedIds = [];
+                gameState.purchasedIds.push(selectedBuildingToPlace.id);
+            }
+
+            gameState.placedBuildings[key] = { name: selectedBuildingToPlace.name };
+            selectedBuildingToPlace = null;
+            updateUI();
+        }
+
+        document.getElementById('btnExpand').onclick = () => {
+            const cost = gameState.gridSize * 200;
+            if (gameState.balance >= cost) {
+                gameState.balance -= cost;
+                gameState.gridSize++;
                 updateUI();
-            } else { alert("Не вистачає FUAH!"); }
-        }
+                alert("Поле розширено!");
+            } else { alert(`Треба ${cost} FUAH`); }
+        };
 
-        function deleteBuilding(id) {
-            remove(ref(db, 'global_buildings/' + id)).then(() => alert("Видалено!"));
-        }
+        // FIREBASE EVENTS & SYNC (ВЖЕ ІСНУЮЧІ)
+        function deleteBuilding(id) { remove(ref(db, 'global_buildings/' + id)); }
 
-        // FIREBASE EVENTS
-        onValue(ref(db, 'global_buildings'), (snapshot) => {
-            globalBuildings = snapshot.val() || {};
-            renderShop();
-        });
+        onValue(ref(db, 'global_buildings'), (snap) => { globalBuildings = snap.val() || {}; renderShop(); });
 
-        // ПРИВ'ЯЗКА КНОПОК (через addEventListener, бо це module)
         document.getElementById('btnSave').onclick = () => {
             const code = document.getElementById('syncCode').value;
-            if (!code) return alert("Введіть код!");
+            if (!code) return alert("Код!");
             gameState.lastLogin = Date.now();
             set(ref(db, 'players/' + code), gameState).then(() => alert("Збережено!"));
         };
@@ -163,16 +220,14 @@
                 const loaded = snap.val();
                 const now = Date.now();
                 const effectiveMsPerDay = (24 * 60 * 60 * 1000) * (loaded.timeMultiplier || 1);
-                const days = (now - loaded.lastLogin) / effectiveMsPerDay;
-                const earnings = Math.floor(days * (loaded.income || 0));
+                const earnings = Math.floor(((now - loaded.lastLogin) / effectiveMsPerDay) * (loaded.income || 0));
                 
                 gameState = loaded;
-                if (!gameState.purchasedIds) gameState.purchasedIds = [];
+                if (!gameState.placedBuildings) gameState.placedBuildings = {};
                 gameState.balance += earnings;
                 gameState.lastLogin = now;
                 updateUI();
-                alert(`Отримано ${earnings} FUAH офлайн.`);
-            } else { alert("Код не знайдено!"); }
+            }
         };
 
         document.getElementById('btnAddBuild').onclick = () => {
@@ -182,29 +237,13 @@
             const timeMult = parseFloat(document.getElementById('newBuildTime').value) || 0;
             const isOneTime = document.getElementById('isOneTime').checked;
             if (name && price) {
-                const newId = "b_" + Date.now();
-                set(ref(db, 'global_buildings/' + newId), { name, price, income, timeMultiplier: timeMult, isOneTime });
-                alert("Додано!");
-            }
-        };
-
-        document.getElementById('btnEditPlayer').onclick = async () => {
-            const code = document.getElementById('targetCode').value;
-            const amount = parseFloat(document.getElementById('amountChange').value);
-            const pRef = ref(db, 'players/' + code);
-            const snap = await get(pRef);
-            if (snap.exists()) {
-                let d = snap.val();
-                d.balance += amount;
-                update(pRef, { balance: d.balance });
-                alert("Баланс змінено!");
+                set(ref(db, 'global_buildings/b_' + Date.now()), { name, price, income, timeMultiplier: timeMult, isOneTime });
             }
         };
 
         document.getElementById('adminTrigger').onclick = () => {
-            if(prompt("Код:") === "Lahazavr88@99") {
+            if(prompt("Пароль:") === "Lahazavr88@99") {
                 document.getElementById('adminPanel').style.display = 'block';
-                document.body.classList.add('admin-mode');
                 renderShop();
             }
         };
