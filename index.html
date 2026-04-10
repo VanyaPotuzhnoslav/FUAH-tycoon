@@ -3,38 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FUAH Tycoon: Advanced Online</title>
+    <title>FUAH Tycoon: Fixed Online</title>
     <style>
-        
         body { font-family: 'Segoe UI', sans-serif; background: #eef2f3; text-align: center; padding: 20px; }
         .game-container { background: white; padding: 25px; border-radius: 20px; display: inline-block; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 380px; }
         .stats { background: #fff9c4; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-weight: bold; border: 2px solid #fbc02d; }
         .shop-container { margin: 20px 0; display: flex; flex-direction: column; gap: 10px; }
         .building-card { background: #f9f9f9; border: 1px solid #ddd; padding: 10px; border-radius: 8px; text-align: left; position: relative; }
         .buy-btn { background: #4caf50; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; width: 100%; margin-top: 5px; }
-        .buy-btn:disabled { background: #ccc; cursor: not-allowed; }
         .admin-panel { display: none; margin-top: 20px; padding: 15px; background: #ffebee; border: 2px dashed #f44336; border-radius: 12px; text-align: left; }
-        .admin-panel input[type="text"], .admin-panel input[type="number"] { width: 90%; margin-bottom: 8px; padding: 5px; }
+        .admin-panel input { width: 90%; margin-bottom: 8px; padding: 5px; }
         .sync-section { margin-top: 20px; background: #e3f2fd; padding: 15px; border-radius: 12px; }
         .btn-blue { background: #2196f3; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; margin: 5px; }
         .badge { background: #ff5722; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; position: absolute; top: 5px; right: 5px; }
-.delete-btn {
-    background: #f44336;
-    color: white;
-    border: none;
-    padding: 5px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.8rem;
-    position: absolute;
-    bottom: 10px;
-    right: 10px;
-    display: none; /* Спочатку прихована */
-}
-.admin-mode .delete-btn {
-    display: block; /* Показуємо лише в режимі адміна */
-}
         
+        .delete-btn {
+            background: #f44336; color: white; border: none; padding: 5px 8px; border-radius: 4px;
+            cursor: pointer; font-size: 0.8rem; position: absolute; bottom: 10px; right: 10px; display: none;
+        }
+        .admin-mode .delete-btn { display: block; }
     </style>
 </head>
 <body>
@@ -66,17 +53,17 @@
             <input type="number" id="newBuildIncome" placeholder="Дохід (+)">
             <input type="number" id="newBuildTime" step="0.1" placeholder="Множник часу (напр. 0.5)" value="0">
             <label><input type="checkbox" id="isOneTime"> Одноразова</label>
-            <button onclick="window.addNewBuilding()" style="width:100%; margin-top:10px;">Додати</button>
+            <button id="btnAddBuild" style="width:100%; margin-top:10px;">Додати будівлю</button>
             <hr>
             <input type="text" id="targetCode" placeholder="Код гравця">
             <input type="number" id="amountChange" placeholder="FUAH +/-">
-            <button onclick="window.editPlayerBalance()">Змінити баланс</button>
+            <button id="btnEditPlayer">Змінити баланс</button>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, set, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCd7p3gyOGqlQZsddgkEt4sdcwWPZnCM5M",
@@ -90,14 +77,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // Стан гри (додано timeMultiplier та список куплених ID)
-        let gameState = { 
-            balance: 1000, 
-            income: 0, 
-            timeMultiplier: 1.0, 
-            purchasedIds: [], 
-            lastLogin: Date.now() 
-        };
+        let gameState = { balance: 1000, income: 0, timeMultiplier: 1.0, purchasedIds: [], lastLogin: Date.now() };
         let globalBuildings = {};
 
         function updateUI() {
@@ -107,147 +87,108 @@
             renderShop();
         }
 
-       // Функція для відображення магазину
-function renderShop() {
-    const shopEl = document.getElementById('shop');
-    const isAdminVisible = document.getElementById('adminPanel').style.display === 'block';
-    
-    // Додаємо клас контейнеру, щоб показати кнопки видалення, якщо адмін-панель відкрита
-    if (isAdminVisible) {
-        document.body.classList.add('admin-mode');
-    }
+        function renderShop() {
+            const shopEl = document.getElementById('shop');
+            const isAdminVisible = document.getElementById('adminPanel').style.display === 'block';
+            if (isAdminVisible) document.body.classList.add('admin-mode');
 
-    shopEl.innerHTML = '';
-    
-    for (let id in globalBuildings) {
-        const b = globalBuildings[id];
-        const isBought = gameState.purchasedIds && gameState.purchasedIds.includes(id);
-        
-        if (b.isOneTime && isBought) continue; 
+            shopEl.innerHTML = '';
+            for (let id in globalBuildings) {
+                const b = globalBuildings[id];
+                const isBought = gameState.purchasedIds && gameState.purchasedIds.includes(id);
+                if (b.isOneTime && isBought) continue; 
 
-        const card = document.createElement('div');
-        card.className = 'building-card';
-        let info = b.income > 0 ? `+${b.income} FUAH/дн` : `Прискорює час`;
-        if (b.isOneTime) card.innerHTML += `<span class="badge">1-разове</span>`;
-        
-        card.innerHTML += `<b>${b.name}</b><br>Ціна: ${b.price} | ${info}`;
-        
-        // Кнопка покупки
-        const btnBuy = document.createElement('button');
-        btnBuy.className = 'buy-btn';
-        btnBuy.innerText = 'Купити';
-        btnBuy.onclick = () => buyBuilding(id, b);
-        card.appendChild(btnBuy);
+                const card = document.createElement('div');
+                card.className = 'building-card';
+                let info = b.income > 0 ? `+${b.income} FUAH/дн` : `Прискорює час`;
+                if (b.isOneTime) card.innerHTML += `<span class="badge">1-разове</span>`;
+                card.innerHTML += `<b>${b.name}</b><br>Ціна: ${b.price} | ${info}`;
+                
+                const btnBuy = document.createElement('button');
+                btnBuy.className = 'buy-btn';
+                btnBuy.innerText = 'Купити';
+                btnBuy.onclick = () => buyBuilding(id, b);
+                card.appendChild(btnBuy);
 
-        // КНОПКА ВИДАЛЕННЯ (Кошик)
-        const btnDel = document.createElement('button');
-        btnDel.className = 'delete-btn';
-        btnDel.innerHTML = '🗑️';
-        btnDel.title = 'Видалити будівлю для всіх';
-        btnDel.onclick = (e) => {
-            e.stopPropagation(); // Щоб не спрацювала покупка
-            if(confirm(`Видалити "${b.name}" з магазину для всіх гравців?`)) {
-                window.deleteBuilding(id);
+                const btnDel = document.createElement('button');
+                btnDel.className = 'delete-btn';
+                btnDel.innerHTML = '🗑️';
+                btnDel.onclick = (e) => {
+                    e.stopPropagation();
+                    if(confirm(`Видалити "${b.name}"?`)) deleteBuilding(id);
+                };
+                card.appendChild(btnDel);
+                shopEl.appendChild(card);
             }
-        };
-        card.appendChild(btnDel);
-        
-        shopEl.appendChild(card);
-    }
-}
+        }
 
-// Функція видалення будівлі з Firebase
-import { remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
-window.deleteBuilding = (id) => {
-    const bRef = ref(db, 'global_buildings/' + id);
-    remove(bRef)
-        .then(() => alert("Будівлю видалено успішно!"))
-        .catch((error) => alert("Помилка видалення: " + error.message));
-};
-
-// Оновимо також тригер адмін-панелі, щоб магазин перерендерився
-document.getElementById('adminTrigger').onclick = () => {
-    if(prompt("Код:") === "Lahazavr88@99") {
-        document.getElementById('adminPanel').style.display = 'block';
-        renderShop(); // Перемальовуємо магазин, щоб з'явилися кошики
-    }
-};
         function buyBuilding(id, b) {
             if (gameState.balance >= b.price) {
                 gameState.balance -= b.price;
                 gameState.income += (b.income || 0);
-                
-                // Якщо є множник часу (наприклад, 0.1 - скорочує час на 10%)
                 if (b.timeMultiplier > 0) {
-                    // Формула: новий час = старий час * (1 - бонус)
-                    // Тобто якщо множник 0.5, час між нарахуваннями скоротиться вдвічі
                     gameState.timeMultiplier -= b.timeMultiplier;
-                    if (gameState.timeMultiplier < 0.1) gameState.timeMultiplier = 0.1; // Ліміт швидкості
+                    if (gameState.timeMultiplier < 0.1) gameState.timeMultiplier = 0.1;
                 }
-
                 if (b.isOneTime) {
                     if (!gameState.purchasedIds) gameState.purchasedIds = [];
                     gameState.purchasedIds.push(id);
                 }
-
                 updateUI();
             } else { alert("Не вистачає FUAH!"); }
         }
 
-        // FIREBASE ЛОГІКА
+        function deleteBuilding(id) {
+            remove(ref(db, 'global_buildings/' + id)).then(() => alert("Видалено!"));
+        }
+
+        // FIREBASE EVENTS
         onValue(ref(db, 'global_buildings'), (snapshot) => {
             globalBuildings = snapshot.val() || {};
             renderShop();
         });
 
-        window.saveGame = () => {
+        // ПРИВ'ЯЗКА КНОПОК (через addEventListener, бо це module)
+        document.getElementById('btnSave').onclick = () => {
             const code = document.getElementById('syncCode').value;
             if (!code) return alert("Введіть код!");
             gameState.lastLogin = Date.now();
             set(ref(db, 'players/' + code), gameState).then(() => alert("Збережено!"));
         };
 
-        window.loadGame = async () => {
+        document.getElementById('btnLoad').onclick = async () => {
             const code = document.getElementById('syncCode').value;
             const snap = await get(ref(db, 'players/' + code));
             if (snap.exists()) {
                 const loaded = snap.val();
                 const now = Date.now();
-                
-                // Важливо: множник часу впливає на швидкість отримання грошей
-                // Тепер ділимо стандартний день на множник (якщо множник 0.5, гроші йдуть вдвічі швидше)
                 const effectiveMsPerDay = (24 * 60 * 60 * 1000) * (loaded.timeMultiplier || 1);
                 const days = (now - loaded.lastLogin) / effectiveMsPerDay;
-                const earnings = Math.floor(days * loaded.income);
+                const earnings = Math.floor(days * (loaded.income || 0));
                 
                 gameState = loaded;
                 if (!gameState.purchasedIds) gameState.purchasedIds = [];
                 gameState.balance += earnings;
                 gameState.lastLogin = now;
                 updateUI();
-                alert(`Вітаємо! Ви отримали ${earnings} FUAH за час офлайну.`);
+                alert(`Отримано ${earnings} FUAH офлайн.`);
             } else { alert("Код не знайдено!"); }
         };
 
-        // АДМІНКА
-        window.addNewBuilding = () => {
+        document.getElementById('btnAddBuild').onclick = () => {
             const name = document.getElementById('newBuildName').value;
             const price = parseInt(document.getElementById('newBuildPrice').value);
             const income = parseInt(document.getElementById('newBuildIncome').value) || 0;
             const timeMult = parseFloat(document.getElementById('newBuildTime').value) || 0;
             const isOneTime = document.getElementById('isOneTime').checked;
-
             if (name && price) {
                 const newId = "b_" + Date.now();
-                set(ref(db, 'global_buildings/' + newId), { 
-                    name, price, income, timeMultiplier: timeMult, isOneTime 
-                });
+                set(ref(db, 'global_buildings/' + newId), { name, price, income, timeMultiplier: timeMult, isOneTime });
                 alert("Додано!");
             }
         };
 
-        window.editPlayerBalance = async () => {
+        document.getElementById('btnEditPlayer').onclick = async () => {
             const code = document.getElementById('targetCode').value;
             const amount = parseFloat(document.getElementById('amountChange').value);
             const pRef = ref(db, 'players/' + code);
@@ -256,14 +197,16 @@ document.getElementById('adminTrigger').onclick = () => {
                 let d = snap.val();
                 d.balance += amount;
                 update(pRef, { balance: d.balance });
-                alert("Готово!");
+                alert("Баланс змінено!");
             }
         };
 
-        document.getElementById('btnSave').onclick = window.saveGame;
-        document.getElementById('btnLoad').onclick = window.loadGame;
         document.getElementById('adminTrigger').onclick = () => {
-            if(prompt("Код:") === "Lahazavr88@99") document.getElementById('adminPanel').style.display='block';
+            if(prompt("Код:") === "Lahazavr88@99") {
+                document.getElementById('adminPanel').style.display = 'block';
+                document.body.classList.add('admin-mode');
+                renderShop();
+            }
         };
 
         updateUI();
