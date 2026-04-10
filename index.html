@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FUAH Tycoon: Advanced Online</title>
     <style>
+        
         body { font-family: 'Segoe UI', sans-serif; background: #eef2f3; text-align: center; padding: 20px; }
         .game-container { background: white; padding: 25px; border-radius: 20px; display: inline-block; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 380px; }
         .stats { background: #fff9c4; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-weight: bold; border: 2px solid #fbc02d; }
@@ -17,6 +18,23 @@
         .sync-section { margin-top: 20px; background: #e3f2fd; padding: 15px; border-radius: 12px; }
         .btn-blue { background: #2196f3; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; margin: 5px; }
         .badge { background: #ff5722; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; position: absolute; top: 5px; right: 5px; }
+.delete-btn {
+    background: #f44336;
+    color: white;
+    border: none;
+    padding: 5px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    display: none; /* Спочатку прихована */
+}
+.admin-mode .delete-btn {
+    display: block; /* Показуємо лише в режимі адміна */
+}
+        
     </style>
 </head>
 <body>
@@ -89,34 +107,72 @@
             renderShop();
         }
 
-        function renderShop() {
-            const shopEl = document.getElementById('shop');
-            shopEl.innerHTML = '';
-            
-            for (let id in globalBuildings) {
-                const b = globalBuildings[id];
-                const isBought = gameState.purchasedIds && gameState.purchasedIds.includes(id);
-                
-                // Якщо одноразова і вже куплена - можна або приховати, або заблокувати
-                if (b.isOneTime && isBought) continue; 
+       // Функція для відображення магазину
+function renderShop() {
+    const shopEl = document.getElementById('shop');
+    const isAdminVisible = document.getElementById('adminPanel').style.display === 'block';
+    
+    // Додаємо клас контейнеру, щоб показати кнопки видалення, якщо адмін-панель відкрита
+    if (isAdminVisible) {
+        document.body.classList.add('admin-mode');
+    }
 
-                const card = document.createElement('div');
-                card.className = 'building-card';
-                let info = b.income > 0 ? `+${b.income} FUAH/дн` : `Прискорює час`;
-                if (b.isOneTime) card.innerHTML += `<span class="badge">1-разове</span>`;
-                
-                card.innerHTML += `<b>${b.name}</b><br>Ціна: ${b.price} | ${info}`;
-                
-                const btn = document.createElement('button');
-                btn.className = 'buy-btn';
-                btn.innerText = 'Купити';
-                btn.onclick = () => buyBuilding(id, b);
-                
-                card.appendChild(btn);
-                shopEl.appendChild(card);
+    shopEl.innerHTML = '';
+    
+    for (let id in globalBuildings) {
+        const b = globalBuildings[id];
+        const isBought = gameState.purchasedIds && gameState.purchasedIds.includes(id);
+        
+        if (b.isOneTime && isBought) continue; 
+
+        const card = document.createElement('div');
+        card.className = 'building-card';
+        let info = b.income > 0 ? `+${b.income} FUAH/дн` : `Прискорює час`;
+        if (b.isOneTime) card.innerHTML += `<span class="badge">1-разове</span>`;
+        
+        card.innerHTML += `<b>${b.name}</b><br>Ціна: ${b.price} | ${info}`;
+        
+        // Кнопка покупки
+        const btnBuy = document.createElement('button');
+        btnBuy.className = 'buy-btn';
+        btnBuy.innerText = 'Купити';
+        btnBuy.onclick = () => buyBuilding(id, b);
+        card.appendChild(btnBuy);
+
+        // КНОПКА ВИДАЛЕННЯ (Кошик)
+        const btnDel = document.createElement('button');
+        btnDel.className = 'delete-btn';
+        btnDel.innerHTML = '🗑️';
+        btnDel.title = 'Видалити будівлю для всіх';
+        btnDel.onclick = (e) => {
+            e.stopPropagation(); // Щоб не спрацювала покупка
+            if(confirm(`Видалити "${b.name}" з магазину для всіх гравців?`)) {
+                window.deleteBuilding(id);
             }
-        }
+        };
+        card.appendChild(btnDel);
+        
+        shopEl.appendChild(card);
+    }
+}
 
+// Функція видалення будівлі з Firebase
+import { remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+window.deleteBuilding = (id) => {
+    const bRef = ref(db, 'global_buildings/' + id);
+    remove(bRef)
+        .then(() => alert("Будівлю видалено успішно!"))
+        .catch((error) => alert("Помилка видалення: " + error.message));
+};
+
+// Оновимо також тригер адмін-панелі, щоб магазин перерендерився
+document.getElementById('adminTrigger').onclick = () => {
+    if(prompt("Код:") === "Lahazavr88@99") {
+        document.getElementById('adminPanel').style.display = 'block';
+        renderShop(); // Перемальовуємо магазин, щоб з'явилися кошики
+    }
+};
         function buyBuilding(id, b) {
             if (gameState.balance >= b.price) {
                 gameState.balance -= b.price;
