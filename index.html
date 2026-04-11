@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FUAH Tycoon: Grid Fix</title>
+    <title>FUAH Tycoon: Offline Income Fix</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #eef2f3; text-align: center; padding: 20px; margin: 0; }
         .main-layout { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
@@ -104,9 +104,16 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    // Початковий стан
     let gameState = { 
-        nickname: "", balance: 1000, income: 0, gridSize: 6, placedBuildings: {}, lastLogin: Date.now() 
+        nickname: "", 
+        balance: 1000, 
+        income: 0, 
+        gridSize: 6, 
+        placedBuildings: {}, 
+        lastLogin: Date.now() 
     };
+
     let globalBuildings = {};
     let selectedBuild = null;
 
@@ -117,7 +124,7 @@
         renderShop();
     }
 
-    // --- КЛІКЕР ---
+    // КЛІКЕР
     document.getElementById('beaverBtn').onclick = (e) => {
         gameState.balance += 5;
         document.getElementById('balance').innerText = Math.floor(gameState.balance);
@@ -138,7 +145,9 @@
         gridEl.innerHTML = '';
 
         for (let i = 0; i < size * size; i++) {
-            const key = `${Math.floor(i / size)}-${i % size}`;
+            const row = Math.floor(i / size);
+            const col = i % size;
+            const key = `${row}-${col}`;
             const cell = document.createElement('div');
             cell.className = 'cell';
             
@@ -150,13 +159,19 @@
 
             cell.onclick = () => {
                 if (!selectedBuild) return;
-                if (gameState.placedBuildings && gameState.placedBuildings[key]) return alert("Зайнято!");
+                if (gameState.placedBuildings[key]) return alert("Зайнято!");
                 if (gameState.balance < selectedBuild.price) return alert("Бракує FUAH!");
 
                 gameState.balance -= selectedBuild.price;
                 gameState.income += (selectedBuild.income || 0);
-                if(!gameState.placedBuildings) gameState.placedBuildings = {};
-                gameState.placedBuildings[key] = { name: selectedBuild.name, img: selectedBuild.img };
+                
+                // Створюємо об'єкт, якщо його нема
+                if (!gameState.placedBuildings) gameState.placedBuildings = {};
+                gameState.placedBuildings[key] = { 
+                    name: selectedBuild.name, 
+                    img: selectedBuild.img 
+                };
+                
                 selectedBuild = null;
                 updateUI();
             };
@@ -182,7 +197,7 @@
         }
     }
 
-    // --- ЛІДЕРБОРД ---
+    // ЛІДЕРБОРД
     onValue(ref(db, 'players'), (snap) => {
         const players = snap.val();
         const listEl = document.getElementById('leaderList');
@@ -199,7 +214,7 @@
         renderShop(); 
     });
 
-    // --- ЗБЕРЕЖЕННЯ ТА ЗАВАНТАЖЕННЯ (ФІКС) ---
+    // ЗБЕРЕЖЕННЯ
     document.getElementById('btnSave').onclick = () => {
         const code = document.getElementById('syncCode').value;
         const nick = document.getElementById('userName').value;
@@ -209,10 +224,11 @@
         gameState.lastLogin = Date.now();
         
         set(ref(db, 'players/' + code), gameState)
-            .then(() => alert("Успішно збережено! Поле та баланс у безпеці."))
+            .then(() => alert("Прогрес збережено!"))
             .catch(e => alert("Помилка: " + e.message));
     };
 
+    // ЗАВАНТАЖЕННЯ (ФІКС БУДІВЕЛЬ ТА ОФЛАЙН ДОХОДУ)
     document.getElementById('btnLoad').onclick = async () => {
         const code = document.getElementById('syncCode').value;
         if (!code) return alert("Введи код!");
@@ -220,19 +236,34 @@
         const snap = await get(ref(db, 'players/' + code));
         if (snap.exists()) {
             const data = snap.val();
-            // Глибоке копіювання, щоб нічого не загубити
-            gameState.nickname = data.nickname || "";
-            gameState.balance = Number(data.balance) || 0;
-            gameState.income = Number(data.income) || 0;
-            gameState.gridSize = Number(data.gridSize) || 6;
-            gameState.placedBuildings = data.placedBuildings || {};
-            gameState.lastLogin = data.lastLogin || Date.now();
+            
+            // 1. Рахуємо офлайн дохід перед перезаписом стану
+            const now = Date.now();
+            const lastTime = data.lastLogin || now;
+            const incomePerMs = (data.income || 0) / (24 * 60 * 60 * 1000); // Дохід на 1 мілісекунду
+            const offlineEarnings = Math.floor((now - lastTime) * incomePerMs);
 
+            // 2. Оновлюємо стан гри
+            gameState = {
+                nickname: data.nickname || "",
+                balance: (Number(data.balance) || 0) + offlineEarnings,
+                income: Number(data.income) || 0,
+                gridSize: Number(data.gridSize) || 6,
+                placedBuildings: data.placedBuildings || {},
+                lastLogin: now
+            };
+
+            // 3. Оновлюємо UI
             document.getElementById('userName').value = gameState.nickname;
-            updateUI(); // Примусове оновлення всього інтерфейсу
-            alert("Дані завантажено!");
+            updateUI();
+            
+            if (offlineEarnings > 0) {
+                alert(`З поверненням! Поки тебе не було, твої будівлі заробили: ${offlineEarnings} FUAH`);
+            } else {
+                alert("Дані завантажено!");
+            }
         } else {
-            alert("Код не знайдено в базі!");
+            alert("Код не знайдено!");
         }
     };
 
@@ -240,7 +271,7 @@
         const cost = (gameState.gridSize || 6) * 300;
         if (gameState.balance >= cost) {
             gameState.balance -= cost;
-            gameState.gridSize = (gameState.gridSize || 6) + 1;
+            gameState.gridSize++;
             updateUI();
         } else alert("Треба " + cost + " FUAH");
     };
