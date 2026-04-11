@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FUAH Tycoon: Offline Income Fix</title>
+    <title>FUAH Tycoon: Final Fix</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #eef2f3; text-align: center; padding: 20px; margin: 0; }
         .main-layout { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
@@ -11,32 +11,27 @@
         .sidebar { width: 280px; display: flex; flex-direction: column; gap: 20px; }
         .stats { background: #fff9c4; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-weight: bold; border: 2px solid #fbc02d; font-size: 1.1rem; }
         
-        /* Клікер */
-        .clicker-section { background: #e8f5e9; padding: 20px; border-radius: 20px; border: 3px solid #4caf50; position: relative; }
-        #beaverBtn { font-size: 50px; background: none; border: none; cursor: pointer; transition: transform 0.1s; user-select: none; }
-        #beaverBtn:active { transform: scale(0.9); }
-        .capy-float { position: absolute; font-size: 24px; animation: floatUp 0.8s forwards; pointer-events: none; z-index: 1000; }
-        @keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-100px); } }
-
-        /* Сітка */
         .grid-container { display: grid; gap: 4px; margin: 15px auto; background: #ccc; padding: 8px; border-radius: 10px; width: fit-content; min-height: 50px; }
         .cell { width: 55px; height: 55px; background: #fff; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #bbb; }
         .cell img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* Магазин */
+        .clicker-section { background: #e8f5e9; padding: 20px; border-radius: 20px; border: 3px solid #4caf50; position: relative; }
+        #beaverBtn { font-size: 50px; background: none; border: none; cursor: pointer; transition: transform 0.1s; user-select: none; }
+        #beaverBtn:active { transform: scale(0.9); }
+
+        .sync-section { background: #e3f2fd; padding: 15px; border-radius: 15px; margin-top: 15px; }
+        .sync-section input { width: 85%; margin-bottom: 8px; padding: 8px; border-radius: 6px; border: 1px solid #90caf9; }
+        .sync-section input.error { border: 2px solid red; background: #ffebee; }
+        
+        .btn { background: #2196f3; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 5px; }
+        .btn:hover { opacity: 0.9; }
+        
         .shop-container { max-height: 250px; overflow-y: auto; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
         .building-card { background: #fdfdfd; border: 1px solid #eee; margin-bottom: 8px; padding: 8px; display: flex; align-items: center; gap: 10px; border-radius: 8px; text-align: left; }
         .build-img { width: 45px; height: 45px; border-radius: 5px; background: #eee; }
-
+        
         .leaderboard { background: white; padding: 15px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: left; }
         .leader-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dotted #ccc; font-size: 0.9rem; }
-        
-        .sync-section { background: #e3f2fd; padding: 15px; border-radius: 15px; margin-top: 15px; }
-        .sync-section input { width: 85%; margin-bottom: 8px; padding: 8px; border-radius: 6px; border: 1px solid #90caf9; }
-        
-        .btn { background: #2196f3; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 5px; }
-        .btn-green { background: #4caf50; }
-        .admin-panel { display: none; margin-top: 20px; padding: 15px; background: #ffebee; border: 2px dashed #f44336; border-radius: 12px; text-align: left; }
     </style>
 </head>
 <body>
@@ -75,16 +70,7 @@
             <button class="btn" id="btnLoad">📂 Завантажити</button>
         </div>
 
-        <button id="adminTrigger" style="margin-top:20px; opacity:0.1; border:none; background:none;">Адмін</button>
-
-        <div id="adminPanel" class="admin-panel">
-            <h4>Панель Лахазавра 🦖</h4>
-            <input type="text" id="newBuildName" placeholder="Назва">
-            <input type="number" id="newBuildPrice" placeholder="Ціна">
-            <input type="number" id="newBuildIncome" placeholder="Дохід">
-            <input type="text" id="newBuildImg" placeholder="URL картинки">
-            <button id="btnAddBuild" class="btn btn-green">Додати будівлю</button>
-        </div>
+        <button id="adminTrigger" style="margin-top:20px; opacity:0.05; border:none; background:none;">Адмін</button>
     </div>
 </div>
 
@@ -104,19 +90,13 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // Початковий стан
     let gameState = { 
-        nickname: "", 
-        balance: 1000, 
-        income: 0, 
-        gridSize: 6, 
-        placedBuildings: {}, 
-        lastLogin: Date.now() 
+        nickname: "", balance: 1000, income: 0, gridSize: 6, placedBuildings: {}, lastLogin: Date.now() 
     };
-
     let globalBuildings = {};
     let selectedBuild = null;
 
+    // Оновлення інтерфейсу
     function updateUI() {
         document.getElementById('balance').innerText = Math.floor(gameState.balance);
         document.getElementById('income').innerText = gameState.income;
@@ -124,20 +104,13 @@
         renderShop();
     }
 
-    // КЛІКЕР
-    document.getElementById('beaverBtn').onclick = (e) => {
+    // Клікер
+    document.getElementById('beaverBtn').onclick = () => {
         gameState.balance += 5;
         document.getElementById('balance').innerText = Math.floor(gameState.balance);
-        const capy = document.createElement('div');
-        capy.className = 'capy-float';
-        capy.innerText = '🐹';
-        capy.style.left = e.clientX + 'px';
-        capy.style.top = e.clientY + 'px';
-        capy.style.position = 'fixed';
-        document.body.appendChild(capy);
-        setTimeout(() => capy.remove(), 800);
     };
 
+    // Малювання сітки
     function renderGrid() {
         const gridEl = document.getElementById('grid');
         const size = gameState.gridSize || 6;
@@ -145,18 +118,14 @@
         gridEl.innerHTML = '';
 
         for (let i = 0; i < size * size; i++) {
-            const row = Math.floor(i / size);
-            const col = i % size;
-            const key = `${row}-${col}`;
+            const key = `${Math.floor(i / size)}-${i % size}`;
             const cell = document.createElement('div');
             cell.className = 'cell';
-            
             if (gameState.placedBuildings && gameState.placedBuildings[key]) {
                 const img = document.createElement('img');
                 img.src = gameState.placedBuildings[key].img || '';
                 cell.appendChild(img);
             }
-
             cell.onclick = () => {
                 if (!selectedBuild) return;
                 if (gameState.placedBuildings[key]) return alert("Зайнято!");
@@ -164,14 +133,8 @@
 
                 gameState.balance -= selectedBuild.price;
                 gameState.income += (selectedBuild.income || 0);
-                
-                // Створюємо об'єкт, якщо його нема
-                if (!gameState.placedBuildings) gameState.placedBuildings = {};
-                gameState.placedBuildings[key] = { 
-                    name: selectedBuild.name, 
-                    img: selectedBuild.img 
-                };
-                
+                if(!gameState.placedBuildings) gameState.placedBuildings = {};
+                gameState.placedBuildings[key] = { name: selectedBuild.name, img: selectedBuild.img };
                 selectedBuild = null;
                 updateUI();
             };
@@ -179,6 +142,7 @@
         }
     }
 
+    // Магазин
     function renderShop() {
         const shopEl = document.getElementById('shop');
         shopEl.innerHTML = '';
@@ -197,7 +161,75 @@
         }
     }
 
-    // ЛІДЕРБОРД
+    // --- ЛОГІКА ЗБЕРЕЖЕННЯ (ФІКС) ---
+    document.getElementById('btnSave').addEventListener('click', () => {
+        const codeInput = document.getElementById('syncCode');
+        const nickInput = document.getElementById('userName');
+        
+        // Перевірка полів
+        if (!codeInput.value || !nickInput.value) {
+            codeInput.classList.add('error');
+            nickInput.classList.add('error');
+            alert("Помилка: Введи Нікнейм та Секретний Код!");
+            return;
+        }
+
+        codeInput.classList.remove('error');
+        nickInput.classList.remove('error');
+
+        gameState.nickname = nickInput.value;
+        gameState.lastLogin = Date.now();
+
+        console.log("Зберігаю дані...", gameState);
+
+        set(ref(db, 'players/' + codeInput.value), gameState)
+            .then(() => alert("Прогрес успішно збережено на сервері!"))
+            .catch(err => alert("Помилка бази даних: " + err.message));
+    });
+
+    // --- ЛОГІКА ЗАВАНТАЖЕННЯ (ФІКС) ---
+    document.getElementById('btnLoad').onclick = async () => {
+        const code = document.getElementById('syncCode').value;
+        if (!code) return alert("Введи Секретний Код для завантаження!");
+
+        try {
+            const snap = await get(ref(db, 'players/' + code));
+            if (snap.exists()) {
+                const data = snap.val();
+                
+                // Розрахунок офлайн прибутку
+                const now = Date.now();
+                const incomePerMs = (data.income || 0) / (24 * 60 * 60 * 1000);
+                const earnings = Math.floor((now - (data.lastLogin || now)) * incomePerMs);
+
+                // Оновлюємо все
+                gameState.nickname = data.nickname || "";
+                gameState.balance = (Number(data.balance) || 0) + earnings;
+                gameState.income = Number(data.income) || 0;
+                gameState.gridSize = Number(data.gridSize) || 6;
+                gameState.placedBuildings = data.placedBuildings || {};
+                gameState.lastLogin = now;
+
+                document.getElementById('userName').value = gameState.nickname;
+                updateUI();
+                
+                if (earnings > 0) alert(`З поверненням! Твої будівлі принесли: ${earnings} FUAH`);
+                else alert("Дані завантажено успішно!");
+            } else {
+                alert("Код не знайдено!");
+            }
+        } catch (e) {
+            alert("Помилка завантаження: " + e.message);
+        }
+    };
+
+    // Отримання будівель
+    onValue(ref(db, 'global_buildings'), (snap) => {
+        globalBuildings = snap.val() || {};
+        renderShop();
+    });
+
+    // Лідерборд
     onValue(ref(db, 'players'), (snap) => {
         const players = snap.val();
         const listEl = document.getElementById('leaderList');
@@ -205,93 +237,9 @@
         listEl.innerHTML = '';
         let sorted = Object.values(players).sort((a, b) => (b.balance || 0) - (a.balance || 0));
         sorted.slice(0, 10).forEach((p, idx) => {
-            listEl.innerHTML += `<div class="leader-item"><span>#${idx+1} ${p.nickname || 'Анонім'}</span><b>${Math.floor(p.balance || 0)}</b></div>`;
+            listEl.innerHTML += `<div class="leader-item"><span>#${idx+1} ${p.nickname}</span><b>${Math.floor(p.balance)}</b></div>`;
         });
     });
-
-    onValue(ref(db, 'global_buildings'), (snap) => { 
-        globalBuildings = snap.val() || {}; 
-        renderShop(); 
-    });
-
-    // ЗБЕРЕЖЕННЯ
-    document.getElementById('btnSave').onclick = () => {
-        const code = document.getElementById('syncCode').value;
-        const nick = document.getElementById('userName').value;
-        if (!code || !nick) return alert("Заповни нік і код!");
-        
-        gameState.nickname = nick;
-        gameState.lastLogin = Date.now();
-        
-        set(ref(db, 'players/' + code), gameState)
-            .then(() => alert("Прогрес збережено!"))
-            .catch(e => alert("Помилка: " + e.message));
-    };
-
-    // ЗАВАНТАЖЕННЯ (ФІКС БУДІВЕЛЬ ТА ОФЛАЙН ДОХОДУ)
-    document.getElementById('btnLoad').onclick = async () => {
-        const code = document.getElementById('syncCode').value;
-        if (!code) return alert("Введи код!");
-        
-        const snap = await get(ref(db, 'players/' + code));
-        if (snap.exists()) {
-            const data = snap.val();
-            
-            // 1. Рахуємо офлайн дохід перед перезаписом стану
-            const now = Date.now();
-            const lastTime = data.lastLogin || now;
-            const incomePerMs = (data.income || 0) / (24 * 60 * 60 * 1000); // Дохід на 1 мілісекунду
-            const offlineEarnings = Math.floor((now - lastTime) * incomePerMs);
-
-            // 2. Оновлюємо стан гри
-            gameState = {
-                nickname: data.nickname || "",
-                balance: (Number(data.balance) || 0) + offlineEarnings,
-                income: Number(data.income) || 0,
-                gridSize: Number(data.gridSize) || 6,
-                placedBuildings: data.placedBuildings || {},
-                lastLogin: now
-            };
-
-            // 3. Оновлюємо UI
-            document.getElementById('userName').value = gameState.nickname;
-            updateUI();
-            
-            if (offlineEarnings > 0) {
-                alert(`З поверненням! Поки тебе не було, твої будівлі заробили: ${offlineEarnings} FUAH`);
-            } else {
-                alert("Дані завантажено!");
-            }
-        } else {
-            alert("Код не знайдено!");
-        }
-    };
-
-    document.getElementById('btnExpand').onclick = () => {
-        const cost = (gameState.gridSize || 6) * 300;
-        if (gameState.balance >= cost) {
-            gameState.balance -= cost;
-            gameState.gridSize++;
-            updateUI();
-        } else alert("Треба " + cost + " FUAH");
-    };
-
-    document.getElementById('btnAddBuild').onclick = () => {
-        const name = document.getElementById('newBuildName').value;
-        const price = parseInt(document.getElementById('newBuildPrice').value);
-        if (name && price) {
-            set(ref(db, 'global_buildings/b_' + Date.now()), { 
-                name, price, 
-                income: parseInt(document.getElementById('newBuildIncome').value) || 0,
-                img: document.getElementById('newBuildImg').value 
-            });
-            alert("Додано!");
-        }
-    };
-
-    document.getElementById('adminTrigger').onclick = () => {
-        if(prompt("Пароль:") === "Lahazavr88@99") document.getElementById('adminPanel').style.display = 'block';
-    };
 
     updateUI();
 </script>
