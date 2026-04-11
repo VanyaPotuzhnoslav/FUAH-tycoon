@@ -108,20 +108,72 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    // Стан гри
     let gameState = { 
         nickname: "", balance: 1000, income: 0, gridSize: 6, placedBuildings: {}, lastLogin: Date.now() 
     };
     let globalBuildings = {};
     let selectedBuild = null;
 
-    function updateUI() {
+    // --- ФУНКЦІЇ ІНТЕРФЕЙСУ ---
+    window.updateUI = function() {
         document.getElementById('balance').innerText = Math.floor(gameState.balance);
         document.getElementById('income').innerText = gameState.income;
         renderGrid();
         renderShop();
+    };
+
+    function renderGrid() {
+        const gridEl = document.getElementById('grid');
+        const size = gameState.gridSize || 6;
+        gridEl.style.gridTemplateColumns = `repeat(${size}, 55px)`;
+        gridEl.innerHTML = '';
+        for (let i = 0; i < size * size; i++) {
+            const key = `${Math.floor(i / size)}-${i % size}`;
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            if (gameState.placedBuildings && gameState.placedBuildings[key]) {
+                const img = document.createElement('img');
+                img.src = gameState.placedBuildings[key].img || '';
+                cell.appendChild(img);
+            }
+            cell.onclick = () => {
+                if (!selectedBuild) return;
+                if (gameState.placedBuildings && gameState.placedBuildings[key]) return alert("Зайнято!");
+                if (gameState.balance < selectedBuild.price) return alert("Бракує FUAH!");
+                gameState.balance -= selectedBuild.price;
+                gameState.income += (selectedBuild.income || 0);
+                if(!gameState.placedBuildings) gameState.placedBuildings = {};
+                gameState.placedBuildings[key] = { name: selectedBuild.name, img: selectedBuild.img };
+                selectedBuild = null;
+                updateUI();
+            };
+            gridEl.appendChild(cell);
+        }
     }
 
-    // КЛІКЕР
+    function renderShop() {
+        const shopEl = document.getElementById('shop');
+        if(!shopEl) return;
+        shopEl.innerHTML = '';
+        for (let id in globalBuildings) {
+            const b = globalBuildings[id];
+            const card = document.createElement('div');
+            card.className = 'building-card';
+            card.innerHTML = `<img src="${b.img || ''}" class="build-img">
+                             <div style="flex-grow:1"><b>${b.name}</b><br><small>${b.price} FUAH | +${b.income}</small></div>`;
+            const btn = document.createElement('button');
+            btn.className = 'btn' + (selectedBuild?.id === id ? ' btn-selected' : '');
+            btn.innerText = selectedBuild?.id === id ? '✅' : 'Купити';
+            btn.onclick = () => { selectedBuild = { ...b, id }; renderShop(); };
+            card.appendChild(btn);
+            shopEl.appendChild(card);
+        }
+    }
+
+    // --- ОБРОБНИКИ КНОПОК (ПРЯМА ПРИВ'ЯЗКА) ---
+
+    // Клікер
     document.getElementById('beaverBtn').onclick = (e) => {
         gameState.balance += 5;
         document.getElementById('balance').innerText = Math.floor(gameState.balance);
@@ -135,39 +187,101 @@
         setTimeout(() => capy.remove(), 800);
     };
 
-    // МАЛЮВАННЯ СІТКИ
-    function renderGrid() {
-        const gridEl = document.getElementById('grid');
-        const size = gameState.gridSize || 6;
-        gridEl.style.gridTemplateColumns = `repeat(${size}, 55px)`;
-        gridEl.innerHTML = '';
+    // ЗБЕРЕГТИ (Виправлено через прослуховувач)
+    document.getElementById('btnSave').addEventListener('click', function() {
+        const nick = document.getElementById('userName').value;
+        const code = document.getElementById('syncCode').value;
 
-        for (let i = 0; i < size * size; i++) {
-            const key = `${Math.floor(i / size)}-${i % size}`;
-            const cell = document.createElement('div');
-            cell.className = 'cell';
-            
-            if (gameState.placedBuildings && gameState.placedBuildings[key]) {
-                const img = document.createElement('img');
-                img.src = gameState.placedBuildings[key].img || '';
-                cell.appendChild(img);
-            }
-
-            cell.onclick = () => {
-                if (!selectedBuild) return;
-                if (gameState.placedBuildings && gameState.placedBuildings[key]) return alert("Зайнято!");
-                if (gameState.balance < selectedBuild.price) return alert("Бракує FUAH!");
-
-                gameState.balance -= selectedBuild.price;
-                gameState.income += (selectedBuild.income || 0);
-                if(!gameState.placedBuildings) gameState.placedBuildings = {};
-                gameState.placedBuildings[key] = { name: selectedBuild.name, img: selectedBuild.img };
-                selectedBuild = null;
-                updateUI();
-            };
-            gridEl.appendChild(cell);
+        if (!nick || !code) {
+            alert("Помилка: Впиши нікнейм та код!");
+            return;
         }
-    }
+
+        gameState.nickname = nick;
+        gameState.lastLogin = Date.now();
+
+        // Явно вказуємо шлях для Firebase
+        const playerRef = ref(db, 'players/' + code);
+        
+        set(playerRef, gameState)
+            .then(() => {
+                alert("УРА! Прогрес збережено!");
+                console.log("Дані в базі:", gameState);
+            })
+            .catch((error) => {
+                alert("Помилка Firebase: " + error.message);
+                console.error(error);
+            });
+    });
+
+    // ЗАВАНТАЖИТИ
+    document.getElementById('btnLoad').addEventListener('click', async function() {
+        const code = document.getElementById('syncCode').value;
+        if (!code) return alert("Введи код!");
+
+        try {
+            const snap = await get(ref(db, 'players/' + code));
+            if (snap.exists()) {
+                const data = snap.val();
+                const now = Date.now();
+                const earnings = Math.floor((now - (data.lastLogin || now)) * ((data.income || 0) / 86400000));
+
+                gameState = {
+                    nickname: data.nickname || "",
+                    balance: (Number(data.balance) || 0) + earnings,
+                    income: Number(data.income) || 0,
+                    gridSize: Number(data.gridSize) || 6,
+                    placedBuildings: data.placedBuildings || {},
+                    lastLogin: now
+                };
+
+                document.getElementById('userName').value = gameState.nickname;
+                updateUI();
+                if (earnings > 0) alert(`Дохід за офлайн: ${earnings} FUAH`);
+                else alert("Успішно завантажено!");
+            } else {
+                alert("Такого коду немає!");
+            }
+        } catch (e) {
+            alert("Помилка завантаження: " + e.message);
+        }
+    });
+
+    // РОЗШИРЕННЯ
+    document.getElementById('btnExpand').onclick = () => {
+        const cost = gameState.gridSize * 400;
+        if (gameState.balance >= cost) {
+            gameState.balance -= cost;
+            gameState.gridSize++;
+            updateUI();
+        } else alert("Треба " + cost + " FUAH");
+    };
+
+    // БАЗА ДАНИХ
+    onValue(ref(db, 'players'), (snap) => {
+        const players = snap.val();
+        const listEl = document.getElementById('leaderList');
+        if (!players || !listEl) return;
+        listEl.innerHTML = '';
+        let sorted = Object.values(players).sort((a, b) => (b.balance || 0) - (a.balance || 0));
+        sorted.slice(0, 10).forEach((p, idx) => {
+            listEl.innerHTML += `<div class="leader-item"><span>#${idx+1} ${p.nickname || 'Анонім'}</span><b>${Math.floor(p.balance || 0)}</b></div>`;
+        });
+    });
+
+    onValue(ref(db, 'global_buildings'), (snap) => { 
+        globalBuildings = snap.val() || {}; 
+        renderShop(); 
+    });
+
+    // АДМІНКА
+    document.getElementById('adminTrigger').onclick = () => {
+        if(prompt("Пароль:") === "Lahazavr88@99") document.getElementById('adminPanel').style.display = 'block';
+    };
+
+    // Старт гри
+    updateUI();
+</script>
 
     // МАГАЗИН
     function renderShop() {
